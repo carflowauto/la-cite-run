@@ -44,7 +44,7 @@ function build(){tiles={};coins=[];enemies=[];cans=[];
  [[26],[84],[154]].forEach(e=>enemies.push({x:e[0]*T,y:GY*T-22,w:14,h:22,vx:0,t:'gas',on:1}));
 }
 function solid(i,j){const t=tiles[i+','+j];return t&&t!=='u'?t:(t==='u'?'u':null);}
-let P,C,state='title',score,lives,camX,trail,time0,inv,keys={},tk={L:0,R:0,J:0},pops=[];
+let P,C,state='title',score,lives,camX,trail,time0,inv,keys={},tk={L:0,R:0,J:0},pops=[],sup=0,squash=[],beb={x:-999,t:8};
 function reset(full){if(full){score=0;lives=3;build();}P={x:40,y:GY*T-28,w:12,h:28,vx:0,vy:0,on:0,f:1,jh:0};C={x:20,y:GY*T-28,f:1};trail=[];camX=0;inv=1.5;}
 reset(true);
 const kmap={ArrowLeft:'l',KeyA:'l',ArrowRight:'r',KeyD:'r',ArrowUp:'j',KeyW:'j',Space:'j'};
@@ -66,21 +66,24 @@ function moveX(o){const j0=Math.floor(o.y/T),j1=Math.floor((o.y+o.h-1)/T);
 function moveY(o){const i0=Math.floor(o.x/T),i1=Math.floor((o.x+o.w-1)/T);o.on=0;
  if(o.vy>0){const j=Math.floor((o.y+o.h)/T);for(let i=i0;i<=i1;i++)if(solid(i,j)){o.y=j*T-o.h;o.vy=0;o.on=1;return;}}
  else if(o.vy<0){const j=Math.floor(o.y/T);for(let i=i0;i<=i1;i++){const t=solid(i,j);if(t){o.y=(j+1)*T;o.vy=0;if(t==='q'&&o===P){tiles[i+','+j]='u';score+=100;pops.push({x:i*T+8,y:j*T-4,s:'+100 €',t:1});snd(880,.15);}return;}}}}
-function die(){lives--;snd(150,.4,'sawtooth');if(lives<=0){state='over';saveBest();}else reset(false);}
+function die(){sup=0;lives--;snd(150,.4,'sawtooth');if(lives<=0){state='over';saveBest();}else reset(false);}
 function saveBest(){if(score>best){best=score;try{localStorage.setItem('citeBest',best);}catch(e){}}}
-function update(dt){if(state!=='play')return;inv=Math.max(0,inv-dt);
+function update(dt){if(state!=='play')return;inv=Math.max(0,inv-dt);sup=Math.max(0,sup-dt);
  const L=keys.l||tk.L,R=keys.r||tk.R,J=keys.j||tk.J;
  const acc=600,max=110;if(L){P.vx=Math.max(P.vx-acc*dt,-max);P.f=-1;}else if(R){P.vx=Math.min(P.vx+acc*dt,max);P.f=1;}else P.vx*=Math.pow(.0005,dt);
  if(J&&P.on&&!P.jh){P.vy=-330;P.jh=1;snd(520,.12);}if(!J){P.jh=0;if(P.vy<-120)P.vy=-120;}
  P.vy=Math.min(P.vy+900*dt,500);P.x+=P.vx*dt;if(P.x<camX)P.x=camX;moveX(P);P.y+=P.vy*dt;moveY(P);
  if(P.y>VH+40)die();
  trail.push({x:P.x,y:P.y,f:P.f,m:Math.abs(P.vx)>5});if(trail.length>22){const t=trail.shift();C.x=t.x-14*t.f;C.y=t.y;C.f=t.f;C.m=t.m;}
- for(const c of coins)if(c.on&&hit(P,{x:c.x,y:c.y,w:10,h:14})){c.on=0;const v=c.t==='b'?200:50;score+=v;pops.push({x:c.x,y:c.y,s:'+'+v,t:1});snd(c.t==='b'?1200:900,.1);}
+ for(const c of coins)if(c.on&&hit(P,{x:c.x,y:c.y,w:10,h:14})){c.on=0;const v=c.t==='b'?200:50;score+=v;if(c.t!=='b'){sup=30;pops.push({x:c.x,y:c.y-10,s:'INVINCIBLE !',t:1.2});snd(1500,.3,'triangle');}pops.push({x:c.x,y:c.y,s:'+'+v,t:1});snd(c.t==='b'?1200:900,.1);}
  for(const e of enemies){if(!e.on)continue;
   if(e.vx){e.x+=e.vx*dt;const o={x:e.x,y:e.y,w:e.w,h:e.h,vx:e.vx};const ahead=Math.floor((e.vx>0?e.x+e.w:e.x)/T);
    if(moveX(o)||!solid(ahead,GY)){e.vx=-e.vx;e.x=o.x+(e.vx>0?1:-1);}}
-  if(hit(P,e)){if(e.t==='car'&&P.vy>0&&P.y+P.h-e.y<10){e.on=0;P.vy=-250;score+=150;pops.push({x:e.x,y:e.y,s:'+150',t:1});snd(300,.2);}
+  if(hit(P,e)){if(P.vy>0&&P.y+P.h-e.y<10){const v=e.t==='car'?150:100;e.on=0;squash.push({e:e,t:.4});P.vy=-250;score+=v;pops.push({x:e.x,y:e.y,s:'+'+v,t:1});snd(e.t==='car'?300:420,.2);}
+   else if(sup>0){const v=e.t==='car'?150:100;e.on=0;squash.push({e:e,t:.4});score+=v;pops.push({x:e.x,y:e.y,s:'BOUM +'+v,t:1});snd(200,.15,'sawtooth');}
    else if(!inv)die();}}
+ for(const q of squash)q.t-=dt;squash=squash.filter(q=>q.t>0);
+ beb.t-=dt;if(beb.t<=0&&beb.x<-500){beb.x=-140;beb.t=0;}if(beb.x>-500){beb.x+=22*dt;if(beb.x>VW+160){beb.x=-999;beb.t=20+Math.random()*10;}}
  if(P.x>flagX-6){state='win';score+=lives*500;saveBest();snd(660,.5);}
  camX=Math.max(camX,Math.min(P.x-VW*0.4,LW*T-VW));
  for(const p of pops){p.t-=dt;p.y-=30*dt;}pops=pops.filter(p=>p.t>0);}
@@ -124,19 +127,30 @@ function gas(e,t){const a=Math.round(e.x-camX),b=Math.round(e.y);if(IMG.c){drawI
 function bill(c,t){const a=Math.round(c.x-camX),b=Math.round(c.y+Math.sin(t*4+c.x)*2);R('#3a8a3a',a-1,b+1,13,7);R('#59b85a',a+1,b+4,13,7);x.fillStyle='#173';x.font='bold 5px sans-serif';x.fillText('100€',a+3,b+10);}
 function can(c,t){const a=Math.round(c.x-camX),b=Math.round(c.y+Math.sin(t*4+c.x)*2);if(IMG.v){drawImgBox(IMG.v,a-2,b-5,14,20);return;}R('#ccc',a+1,b,8,2);R('#e83a8a',a+1,b+2,8,11);R('#f8e',a+2,b+2,2,11);x.save();x.translate(a+7,b+13);x.rotate(-Math.PI/2);x.fillStyle='#fff';x.font='bold 5px sans-serif';x.fillText('VODY',0,0);x.restore();}
 function txt(s,a,b,sz,c,al){x.font='bold '+sz+'px monospace';x.textAlign=al||'center';x.fillStyle='#000';x.fillText(s,a+1,b+1);x.fillStyle=c||'#fff';x.fillText(s,a,b);x.textAlign='left';}
-function draw(t){x.setTransform(scale*dpr,0,0,scale*dpr,0,0);bg();
+function bebeta(t){if(beb.x<-500)return;const a=beb.x,b=55+Math.sin(t*1.5)*8;x.save();x.globalAlpha=.85;
+ x.strokeStyle='#555';x.lineWidth=1;x.beginPath();x.moveTo(a-50,b-14);x.lineTo(a-20,b);x.moveTo(a-50,b+14);x.lineTo(a-20,b);x.stroke();
+ R('#fff',a-125,b-14,76,28);x.strokeStyle='#e0338a';x.lineWidth=2;x.strokeRect(a-125,b-14,76,28);x.fillStyle='#e0338a';x.font='bold 14px sans-serif';x.textAlign='center';x.fillText('BEBETA',a-87,b+5);x.textAlign='left';
+ const fl=Math.sin(t*8)*10;x.fillStyle='#ffd1ec';x.beginPath();x.ellipse(a-8,b-20-fl/2,18,10,-.6,0,7);x.ellipse(a+38,b-20-fl/2,18,10,.6,0,7);x.fill();
+ x.fillStyle='#ff7ac0';x.beginPath();x.arc(a+15,b,30,0,7);x.fill();x.fillStyle='#ffb3dc';x.beginPath();x.arc(a+8,b-8,12,0,7);x.fill();
+ x.fillStyle='#222';x.beginPath();x.arc(a+6,b-4,4,0,7);x.arc(a+26,b-4,4,0,7);x.fill();x.fillStyle='#fff';x.fillRect(a+6,b-7,2,2);x.fillRect(a+26,b-7,2,2);
+ x.fillStyle='#e0338a';x.fillRect(a,b+4,6,3);x.fillRect(a+26,b+4,6,3);x.strokeStyle='#222';x.lineWidth=2;x.beginPath();x.arc(a+16,b+6,6,.2,2.9);x.stroke();
+ x.fillStyle='#ffd700';x.beginPath();x.moveTo(a+3,b-28);x.lineTo(a+9,b-42);x.lineTo(a+16,b-30);x.lineTo(a+23,b-42);x.lineTo(a+29,b-28);x.fill();x.restore();}
+function draw(t){x.setTransform(scale*dpr,0,0,scale*dpr,0,0);bg();bebeta(t);
  const i0=Math.floor(camX/T),i1=i0+Math.ceil(VW/T)+1;
  for(let i=i0;i<=i1;i++)for(let j=0;j<20;j++){const tt=tiles[i+','+j];if(tt)tile(tt,i*T-camX,j*T);}
  [22,60,104,130,166,196].forEach(i=>bin(i,GY-2));
  const fx=flagX-camX;R('#ddd',fx,GY*T-130,3,130);R('#e33',fx+3,GY*T-128,22,14);R('#fff',fx+3,GY*T-121,22,2);R('#ffd700',fx-2,GY*T-134,7,5);
  for(const c of coins)if(c.on)(c.t==='b'?bill:can)(c,t);
  for(const e of enemies)if(e.on)(e.t==='car'?car:gas)(e,t);
+ for(const q of squash){const e=q.e,k=q.t/.4,cx=e.x-camX+e.w/2,by=e.y+e.h;x.save();x.globalAlpha=k;x.translate(cx,by);x.scale(1+(1-k),k*.6+.1);x.translate(-cx,-by);(e.t==='car'?car:gas)(e,t);x.restore();
+  x.strokeStyle='rgba(255,230,120,'+k+')';x.lineWidth=2;for(let n=0;n<6;n++){const an=n*1.05,r1=6+(1-k)*14;x.beginPath();x.moveTo(cx+Math.cos(an)*r1*.5,by-8+Math.sin(an)*r1*.5);x.lineTo(cx+Math.cos(an)*r1,by-8+Math.sin(an)*r1);x.stroke();}}
  guy(C.x-camX,C.y,C.f,C.m,t);
- if(!(inv>0&&Math.floor(t*12)%2))heroine(P.x-camX,P.y,P.f,Math.abs(P.vx)>5&&P.on,t);
+ if(sup>0){x.save();x.globalAlpha=.55;x.fillStyle='hsl('+((t*400)%360)+',100%,60%)';x.beginPath();x.ellipse(P.x-camX+P.w/2,P.y+P.h/2,P.w,P.h*.75,0,0,7);x.fill();x.restore();}
+ if(!(inv>0&&Math.floor(t*12)%2)&&!(sup>0&&sup<3&&Math.floor(t*10)%2))heroine(P.x-camX,P.y,P.f,Math.abs(P.vx)>5&&P.on,t);
  for(const p of pops)txt(p.s,p.x-camX,p.y,8,'#ffe066');
- txt('SCORE '+score,6,14,10,'#fff','left');txt('♥ x'+lives,6,27,10,'#ff6b8a','left');txt('RECORD '+best,VW-6,14,10,'#ffe066','right');
+ txt('SCORE '+score,6,14,10,'#fff','left');txt('♥ x'+lives,6,27,10,'#ff6b8a','left');txt('RECORD '+best,VW-6,14,10,'#ffe066','right');if(sup>0)txt('INVINCIBLE '+Math.ceil(sup)+'s',VW/2,30,11,'hsl('+((t*400)%360)+',100%,65%)');
  if(state!=='play'){x.fillStyle='rgba(0,0,0,.55)';x.fillRect(0,0,VW,VH);const m=VW/2;
-  if(state==='title'){txt('LA CITÉ RUN',m,80,28,'#ffcc33');txt('Ramasse les billets de 100 € et les canettes VODY',m,112,9);txt('Saute sur les voitures de police, évite les CREAMY DELUXE',m,126,9);txt('Flèches / WASD + Espace — ou boutons tactiles',m,144,9,'#aaf');txt('Touche ou appuie sur Espace pour jouer',m,180,11,Math.floor(t*2)%2?'#fff':'#ffcc33');}
+  if(state==='title'){txt('LA CITÉ RUN',m,80,28,'#ffcc33');txt('Ramasse les billets de 100 € et les VODY (30s invincible)',m,112,9);txt('Saute sur les voitures de police, écrase les CREAMY DELUXE',m,126,9);txt('Flèches / WASD + Espace — ou boutons tactiles',m,144,9,'#aaf');txt('Touche ou appuie sur Espace pour jouer',m,180,11,Math.floor(t*2)%2?'#fff':'#ffcc33');}
   if(state==='win'){txt('BRAVO ! NIVEAU TERMINÉ',m,100,20,'#7f7');txt('Score : '+score+'   Record : '+best,m,130,11);txt('Touche pour rejouer',m,170,11);}
   if(state==='over'){txt('GAME OVER',m,100,26,'#f55');txt('Score : '+score+'   Record : '+best,m,130,11);txt('Touche pour recommencer',m,170,11);}}}
 let last=0,tt=0;function loop(n){const dt=Math.min(.05,(n-last)/1000||0);last=n;tt+=dt;update(dt);draw(tt);requestAnimationFrame(loop);}
