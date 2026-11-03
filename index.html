@@ -1,18 +1,27 @@
 <!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes"><title>La Cité Run</title>
-<style>html,body{margin:0;height:100%;background:#111;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-canvas{display:block;width:100vw;height:100vh;image-rendering:pixelated}
+<style>html{--sab:env(safe-area-inset-bottom);--sat:env(safe-area-inset-top)}html,body{margin:0;height:100%;background:#111;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+canvas{display:block;position:fixed;left:0;top:0;width:100vw;height:100vh;image-rendering:pixelated}
+#hint{display:none;position:fixed;left:0;right:0;color:#ffd54a;font:bold 14px sans-serif;text-align:center}body.pt #hint{display:block}
 .b{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.25);border:2px solid rgba(255,255,255,.6);color:#fff;font:bold 30px sans-serif;display:flex;align-items:center;justify-content:center}
 #L{left:16px}#R{left:100px}#J{right:20px;width:86px;height:86px}
 @media (hover:hover) and (pointer:fine){.b{display:none}}</style></head><body>
-<canvas id="c"></canvas><div class="b" id="L">◀</div><div class="b" id="R">▶</div><div class="b" id="J">▲</div>
+<canvas id="c"></canvas><div id="hint">↻ Tourne ton téléphone pour jouer en grand</div><div class="b" id="L">◀</div><div class="b" id="R">▶</div><div class="b" id="J">▲</div>
 <script>
 "use strict";
 const cv=document.getElementById('c'),x=cv.getContext('2d');
 const VH=270;let VW=480,scale=1,dpr=1;
-function resize(){dpr=window.devicePixelRatio||1;const w=innerWidth,h=innerHeight;scale=h/VH;VW=Math.ceil(w/scale);cv.width=Math.floor(w*dpr);cv.height=Math.floor(h*dpr);x.imageSmoothingEnabled=false;}
-addEventListener('resize',resize);resize();
+const hint=document.getElementById('hint');
+function resize(){dpr=window.devicePixelRatio||1;const vv=window.visualViewport;const w=vv?vv.width:innerWidth,h=vv?vv.height:innerHeight;
+const touch=('ontouchstart' in window)||navigator.maxTouchPoints>0;const pt=touch&&h>w;document.body.classList.toggle('pt',pt);
+let cw=w,ch=h,top=0;
+if(pt){const sb=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sab'))||0,st=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat'))||0;
+ const bar=130+sb;const avail=h-bar-st-30;ch=Math.min(avail,Math.round(w*VH/300));top=st+Math.max(0,(avail-ch)/2);hint.style.top=(top+ch+6)+'px';}
+else{ch=Math.min(h,w*VH/300);top=(h-ch)/2;}
+scale=ch/VH;VW=Math.ceil(cw/scale);cv.style.width=cw+'px';cv.style.height=ch+'px';cv.style.top=top+'px';
+cv.width=Math.floor(cw*dpr);cv.height=Math.floor(ch*dpr);x.imageSmoothingEnabled=false;}
+addEventListener('resize',resize);addEventListener('orientationchange',()=>setTimeout(resize,200));if(window.visualViewport)visualViewport.addEventListener('resize',resize);resize();
 const faces={};['elle','lui'].forEach(n=>{const i=new Image();i.onload=()=>faces[n]=i;i.onerror=()=>{};i.src='faces/'+n+'.png';});
 const T=16,LW=220,GY=15; // tiles
 let tiles,coins,enemies,cans,flagX,best=+(localStorage.getItem('citeBest')||0);
